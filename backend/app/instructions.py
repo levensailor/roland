@@ -45,8 +45,8 @@ def build_instructions(settings: Settings) -> InstructionsResponse:
                     InstructionStep(
                         title="Power off before removing the card",
                         detail=(
-                            "Never insert or remove the card while the TM-2 is on. That can corrupt the card. "
-                            "Power off, then move the card to this computer."
+                            "Never insert or remove the card while the TM-2 is on. That leaves the FAT dirty "
+                            "and macOS will remount the card read-only. Power off, then move the card here."
                         ),
                     ),
                 ],

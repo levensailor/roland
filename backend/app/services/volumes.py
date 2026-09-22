@@ -10,6 +10,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.models import VolumeInfo
+from app.services.mounts import inspect_mount
 
 
 def list_volumes(settings: Settings, logger: logging.Logger) -> list[VolumeInfo]:
@@ -54,7 +55,7 @@ def _list_dir(root: Path) -> list[Path]:
 
 
 def _describe_volume(path: Path, settings: Settings, logger: logging.Logger) -> VolumeInfo:
-    writable = os.access(path, os.W_OK)
+    mount = inspect_mount(path, logger)
     wave_path = path.joinpath(*settings.wave_parts)
     free_bytes = None
     try:
@@ -66,10 +67,14 @@ def _describe_volume(path: Path, settings: Settings, logger: logging.Logger) -> 
     return VolumeInfo(
         name=path.name,
         path=str(path),
-        writable=writable,
+        writable=mount.writable,
+        mount_readonly=mount.mount_readonly,
+        media_readonly=mount.media_readonly,
+        device=mount.device,
         looks_like_sd=looks_like_sd,
         has_wave_root=wave_path.is_dir(),
         free_bytes=free_bytes,
+        warnings=mount.warnings,
     )
 
 

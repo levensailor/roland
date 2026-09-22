@@ -1,14 +1,15 @@
-"""SD card status, initialization, folders, and sample listing."""
+"""SD card status, initialization, remount, folders, and sample listing."""
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 
 from app.config import Settings, get_settings
+from app.errors import card_http_error
 from app.instructions import build_instructions
 from app.models import (
     CardStatus,
@@ -18,6 +19,7 @@ from app.models import (
     InitCardRequest,
     InstructionsResponse,
     PublicConfig,
+    RemountCardRequest,
     SampleInfo,
 )
 from app.services.sdcard import (
@@ -29,6 +31,7 @@ from app.services.sdcard import (
     destination_folder,
     initialize_card,
     list_samples,
+    remount_card,
 )
 
 
@@ -60,6 +63,62 @@ def get_router(logger: logging.Logger) -> APIRouter:
     def instructions(settings: Settings = Depends(settings_dep)) -> InstructionsResponse:
         return build_instructions(settings)
 
+    @router.get("/card/status", response_model=CardStatus)
+    def status(
+        card_path: str = Query(..., min_length=1),
+        settings: Settings = Depends(settings_dep),
+    ) -> CardStatus:
+        try:
+            return card_status(card_path, settings, logger)
+        except SdCardError as exc:
+            raise card_http_error(exc, logger) from exc
+
+    @router.post("/card/init", response_model=CardStatus)
+    def init_card(
+        payload: InitCardRequest,
+        settings: Settings = Depends(settings_dep),
+    ) -> CardStatus:
+        try:
+            return initialize_card(
+                payload.card_path,
+                settings,
+                logger,
+                create_recommended=payload.create_recommended,
+                remount=payload.remount,
+            )
+        except SdCardError as exc:
+            raise card_http_error(exc, logger) from exc
+
+    @router.post("/card/remount", response_model=CardStatus)
+    def remount(
+        payload: RemountCardRequest,
+        settings: Settings = Depends(settings_dep),
+    ) -> CardStatus:
+        try:
+            return remount_card(payload.card_path, settings, logger)
+        except SdCardError as exc:
+            raise card_http_error(exc, logger) from exc
+
+    @router.post("/folders", response_model=FolderInfo)
+    def add_folder(
+        payload: CreateFolderRequest,
+        settings: Settings = Depends(settings_dep),
+    ) -> FolderInfo:
+        try:
+            return create_folder(payload.card_path, payload.folder_name, settings, logger)
+        except SdCardError as exc:
+            raise card_http_error(exc, logger) from exc
+
+    @router.get("/samples", response_model=list[SampleInfo])
+    def samples(
+        card_path: str = Query(..., min_length=1),
+        settings: Settings = Depends(settings_dep),
+    ) -> list[SampleInfo]:
+        try:
+            return list_samples(card_path, settings, logger)
+        except SdCardError as exc:
+            raise card_http_error(exc, logger) from exc
+
     @router.get("/samples/audio")
     def sample_audio(
         card_path: str = Query(..., min_length=1),
@@ -73,53 +132,8 @@ def get_router(logger: logging.Logger) -> APIRouter:
             if not target.exists() or target.suffix.lower() != ".wav":
                 raise SdCardError("WAV not found in the WAVE folder.")
         except SdCardError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
+            raise card_http_error(exc, logger) from exc
         return FileResponse(path=target, media_type="audio/wav", filename=target.name)
-
-    @router.get("/card/status", response_model=CardStatus)
-    def status(
-        card_path: str = Query(..., min_length=1),
-        settings: Settings = Depends(settings_dep),
-    ) -> CardStatus:
-        try:
-            return card_status(card_path, settings)
-        except SdCardError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @router.post("/card/init", response_model=CardStatus)
-    def init_card(
-        payload: InitCardRequest,
-        settings: Settings = Depends(settings_dep),
-    ) -> CardStatus:
-        try:
-            return initialize_card(
-                payload.card_path,
-                settings,
-                logger,
-                create_recommended=payload.create_recommended,
-            )
-        except SdCardError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @router.post("/folders", response_model=FolderInfo)
-    def add_folder(
-        payload: CreateFolderRequest,
-        settings: Settings = Depends(settings_dep),
-    ) -> FolderInfo:
-        try:
-            return create_folder(payload.card_path, payload.folder_name, settings, logger)
-        except SdCardError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @router.get("/samples", response_model=list[SampleInfo])
-    def samples(
-        card_path: str = Query(..., min_length=1),
-        settings: Settings = Depends(settings_dep),
-    ) -> list[SampleInfo]:
-        try:
-            return list_samples(card_path, settings, logger)
-        except SdCardError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.delete("/samples")
     def remove_sample(
@@ -129,7 +143,7 @@ def get_router(logger: logging.Logger) -> APIRouter:
         try:
             delete_sample(payload.card_path, payload.folder, payload.filename, settings, logger)
         except SdCardError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise card_http_error(exc, logger) from exc
         return {"deleted": payload.filename}
 
     return router

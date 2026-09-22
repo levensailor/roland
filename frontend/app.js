@@ -5,6 +5,7 @@ const api = {
   instructions: "/api/instructions",
   cardStatus: "/api/card/status",
   cardInit: "/api/card/init",
+  cardRemount: "/api/card/remount",
   folders: "/api/folders",
   samples: "/api/samples",
   upload: "/api/samples/upload",
@@ -21,6 +22,7 @@ const els = {
   volumeSelect: document.getElementById("volume-select"),
   cardPath: document.getElementById("card-path"),
   refreshVolumes: document.getElementById("refresh-volumes"),
+  remountCard: document.getElementById("remount-card"),
   initCard: document.getElementById("init-card"),
   cardNote: document.getElementById("card-note"),
   folderSelect: document.getElementById("folder-select"),
@@ -143,10 +145,10 @@ async function loadVolumes() {
   volumes.forEach((volume) => {
     const option = document.createElement("option");
     option.value = volume.path;
-    const flags = [
+      const flags = [
       volume.looks_like_sd ? "TM-2?" : null,
       volume.has_wave_root ? "WAVE" : null,
-      volume.writable ? "RW" : "LOCKED",
+      volume.writable ? "RW" : volume.mount_readonly ? "READ-ONLY" : "LOCKED",
     ]
       .filter(Boolean)
       .join(" / ");
@@ -180,7 +182,8 @@ async function refreshCard() {
     await fetch(`${api.cardStatus}?${new URLSearchParams({ card_path: state.cardPath })}`)
   );
 
-  setBadge(els.cardStatus, status.writable ? "MOUNTED" : "LOCKED", status.writable);
+  const cardLabel = status.writable ? "MOUNTED" : status.mount_readonly ? "READ-ONLY" : "LOCKED";
+  setBadge(els.cardStatus, cardLabel, status.writable);
   els.waveStatus.textContent = status.wave_ready ? status.wave_root : "MISSING";
   els.waveStatus.classList.toggle("is-ok", status.wave_ready);
   els.waveStatus.classList.toggle("is-bad", !status.wave_ready);
@@ -189,9 +192,11 @@ async function refreshCard() {
   const missing = status.missing_recommended.length
     ? ` Missing recommended folders: ${status.missing_recommended.join(", ")}.`
     : "";
-  els.cardNote.textContent = status.wave_ready
+  const warnings = (status.warnings || []).join(" ");
+  const base = status.wave_ready
     ? `${status.wave_path} · ${status.folder_count} folders · ${status.file_count} files.${missing}`
     : `${status.selected_path} has no ${status.wave_root} yet. Press Init WAVE tree.`;
+  els.cardNote.textContent = warnings ? `${base} ${warnings}` : base;
 
   renderFolders(status);
   await loadSamples();
@@ -317,10 +322,29 @@ async function initCard() {
       body: JSON.stringify({
         card_path: state.cardPath,
         create_recommended: true,
+        remount: true,
       }),
     })
   );
-  els.jobStatus.textContent = `Created ${status.wave_root} plus recommended folders.`;
+  const extra = (status.warnings || []).join(" ");
+  els.jobStatus.textContent = status.writable
+    ? `Created ${status.wave_root} plus recommended folders.`
+    : `WAVE tree is ${status.wave_ready ? "present" : "missing"}. ${extra}`.trim();
+  await refreshCard();
+}
+
+async function remountCard() {
+  requireCard();
+  const status = await readJson(
+    await fetch(api.cardRemount, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ card_path: state.cardPath }),
+    })
+  );
+  els.jobStatus.textContent = status.writable
+    ? `Remounted ${status.selected_path} read-write.`
+    : (status.warnings || []).join(" ") || "Card is still read-only.";
   await refreshCard();
 }
 
@@ -434,6 +458,7 @@ function bindUi() {
   });
 
   els.refreshVolumes.addEventListener("click", () => run(loadVolumes));
+  els.remountCard.addEventListener("click", () => run(remountCard));
   els.initCard.addEventListener("click", () => run(initCard));
   els.createFolder.addEventListener("click", () => run(createFolder));
   els.folderSelect.addEventListener("change", highlightSelectedFolder);

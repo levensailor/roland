@@ -6,16 +6,17 @@ import logging
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.config import Settings, get_settings
+from app.errors import card_http_error, http_error
 from app.models import UploadResponse, UploadResult
 from app.services.converter import ConversionError, convert_to_tm2_wav
 from app.services.sdcard import (
     SdCardError,
     assert_folder_capacity,
     destination_folder,
-    resolve_card_path,
+    ensure_writable,
     unique_destination,
 )
 
@@ -35,18 +36,18 @@ def get_router(logger: logging.Logger) -> APIRouter:
         settings: Settings = Depends(settings_dep),
     ) -> UploadResponse:
         if not files:
-            raise HTTPException(status_code=400, detail="Drop at least one audio file.")
+            raise http_error(ValueError("Drop at least one audio file."), logger)
 
         channel_mode = (channels or settings.default_channels).strip().lower()
         if channel_mode not in {"auto", "mono", "stereo"}:
-            raise HTTPException(status_code=400, detail="channels must be auto, mono, or stereo.")
+            raise http_error(ValueError("channels must be auto, mono, or stereo."), logger)
 
         try:
-            resolve_card_path(card_path)
+            ensure_writable(card_path, logger)
             target_folder = destination_folder(card_path, folder, settings)
             assert_folder_capacity(target_folder, len(files), settings)
         except SdCardError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise card_http_error(exc, logger) from exc
 
         results: list[UploadResult] = []
         errors: list[str] = []
@@ -107,7 +108,7 @@ def get_router(logger: logging.Logger) -> APIRouter:
                 errors.append(f"{original_name}: {exc}")
 
         if not results and errors:
-            raise HTTPException(status_code=400, detail=" ".join(errors))
+            raise http_error(ValueError(" ".join(errors)), logger)
 
         folder_label = folder or target_folder.name
         return UploadResponse(

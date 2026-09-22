@@ -30,9 +30,13 @@ class VolumeInfo(BaseModel):
     name: str
     path: str
     writable: bool
+    mount_readonly: bool = False
+    media_readonly: bool = False
+    device: str = ""
     looks_like_sd: bool
     has_wave_root: bool
     free_bytes: int | None = None
+    warnings: list[str] = []
 
 
 class FolderInfo(BaseModel):
@@ -57,6 +61,10 @@ class CardStatus(BaseModel):
     selected_path: str
     exists: bool
     writable: bool
+    mount_readonly: bool = False
+    media_readonly: bool = False
+    device: str = ""
+    fstype: str = ""
     wave_root: str
     wave_path: str
     wave_ready: bool
@@ -66,11 +74,17 @@ class CardStatus(BaseModel):
     folders: list[FolderInfo]
     recommended_folders: list[str]
     missing_recommended: list[str]
+    warnings: list[str] = []
 
 
 class InitCardRequest(BaseModel):
     card_path: str
     create_recommended: bool = True
+    remount: bool = True
+
+
+class RemountCardRequest(BaseModel):
+    card_path: str
 
 
 class CreateFolderRequest(BaseModel):
@@ -123,3 +137,9 @@ class InstructionsResponse(BaseModel):
     format_rules: list[str]
     sections: list[InstructionSection]
     error_codes: list[InstructionStep]
+
+
+class RouteInfo(BaseModel):
+    method: str
+    path: str
+    name: str

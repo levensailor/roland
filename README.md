@@ -82,9 +82,11 @@ Open [http://localhost:8080](http://localhost:8080).
 
 1. Insert the SD card into this computer with the TM-2 powered off.
 2. Select the volume or paste its path.
-3. Click **Init WAVE tree**.
+3. Click **Init WAVE tree**. If the badge says READ-ONLY, macOS mounted a dirty FAT (usually from pulling the card while the TM-2 was on). Use **Remount RW**, or eject and reinsert. The lock switch is a different problem (`Media Read-Only`).
 4. Drag audio onto a folder tile.
 5. Eject the card, insert it with the TM-2 off, then assign files on the module with `INST` and `SHIFT` + `-` / `+` to reach the SD list.
+
+`GET /api/routes` lists every API path. All card write routes accept `{ "card_path": "/Volumes/TM-2", ... }` as JSON except upload, which is multipart form fields `card_path`, `folder`, `channels`, and `files`.
 
 The right-hand **READ THIS EVERY TIME** panel repeats the pad-assignment steps. The TM-2 does not copy samples into internal memory. The card must stay inserted or the display shows `NO CARD`.
 

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.logging_setup import configure_logging
-from app.models import HealthResponse
+from app.models import HealthResponse, RouteInfo
 from app.routers import card, samples, volumes
 from app.services.converter import ffmpeg_available
 
@@ -59,6 +59,22 @@ def health() -> HealthResponse:
 app.include_router(volumes.get_router(logger))
 app.include_router(card.get_router(logger))
 app.include_router(samples.get_router(logger))
+
+
+@app.get("/api/routes", response_model=list[RouteInfo])
+def list_routes() -> list[RouteInfo]:
+    routes: list[RouteInfo] = []
+    for route in app.routes:
+        methods = sorted(getattr(route, "methods", []) or [])
+        path = getattr(route, "path", "")
+        name = getattr(route, "name", "")
+        if not path.startswith("/api"):
+            continue
+        for method in methods:
+            if method == "HEAD":
+                continue
+            routes.append(RouteInfo(method=method, path=path, name=name))
+    return sorted(routes, key=lambda item: (item.path, item.method))
 
 if settings.frontend_dir.exists():
     app.mount(

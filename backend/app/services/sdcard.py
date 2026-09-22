@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import unicodedata
 from pathlib import Path
@@ -11,6 +10,7 @@ from pathlib import Path
 from app.config import Settings
 from app.models import CardStatus, FolderInfo, SampleInfo
 from app.services.converter import inspect_wav
+from app.services.mounts import inspect_mount, remount_read_write, write_blocked_message
 
 
 class SdCardError(Exception):
@@ -18,6 +18,28 @@ class SdCardError(Exception):
 
 
 ROOT_FOLDER_LABEL = "(WAVE root)"
+
+
+def ensure_writable(card_path: str, logger: logging.Logger, remount: bool = True) -> Path:
+    root = resolve_card_path(card_path)
+    mount = inspect_mount(root, logger)
+    if remount and not mount.writable:
+        try:
+            mount = remount_read_write(root, logger)
+        except RuntimeError as exc:
+            raise SdCardError(str(exc)) from exc
+    if not mount.writable:
+        raise SdCardError(write_blocked_message(mount))
+    return root
+
+
+def remount_card(card_path: str, settings: Settings, logger: logging.Logger) -> CardStatus:
+    root = resolve_card_path(card_path)
+    try:
+        remount_read_write(root, logger)
+    except RuntimeError as exc:
+        raise SdCardError(str(exc)) from exc
+    return card_status(str(root), settings, logger)
 
 
 def resolve_card_path(card_path: str) -> Path:
@@ -36,27 +58,42 @@ def initialize_card(
     settings: Settings,
     logger: logging.Logger,
     create_recommended: bool = True,
+    remount: bool = True,
 ) -> CardStatus:
     root = resolve_card_path(card_path)
-    if not os.access(root, os.W_OK):
-        raise SdCardError("The selected card is not writable. Unlock the SD write-protect switch.")
+    mount = inspect_mount(root, logger)
+    if remount and not mount.writable:
+        try:
+            mount = remount_read_write(root, logger)
+        except RuntimeError as exc:
+            logger.info("Init remount skipped: %s", exc)
+            if not wave_directory(root, settings).is_dir():
+                raise SdCardError(str(exc)) from exc
 
     wave = wave_directory(root, settings)
-    wave.mkdir(parents=True, exist_ok=True)
-    logger.info("Ensured WAVE root at %s", wave)
+    if mount.writable:
+        try:
+            wave.mkdir(parents=True, exist_ok=True)
+            logger.info("Ensured WAVE root at %s", wave)
+            if create_recommended:
+                for folder_name in settings.default_folder_names:
+                    safe_name = sanitize_name(folder_name, settings.max_filename_length)
+                    target = wave / safe_name
+                    target.mkdir(exist_ok=True)
+                    logger.info("Ensured recommended folder %s", target)
+        except OSError as exc:
+            raise SdCardError(f"Could not write {settings.wave_root}: {exc}") from exc
+    elif not wave.is_dir():
+        raise SdCardError(write_blocked_message(mount))
+    else:
+        logger.info("WAVE tree already present at %s; card is not writable", wave)
 
-    if create_recommended:
-        for folder_name in settings.default_folder_names:
-            safe_name = sanitize_name(folder_name, settings.max_filename_length)
-            target = wave / safe_name
-            target.mkdir(exist_ok=True)
-            logger.info("Ensured recommended folder %s", target)
-
-    return card_status(str(root), settings)
+    return card_status(str(root), settings, logger)
 
 
-def card_status(card_path: str, settings: Settings) -> CardStatus:
+def card_status(card_path: str, settings: Settings, logger: logging.Logger) -> CardStatus:
     root = resolve_card_path(card_path)
+    mount = inspect_mount(root, logger)
     wave = wave_directory(root, settings)
     folders = list_folders(wave, settings) if wave.is_dir() else []
     file_count = sum(folder.file_count for folder in folders)
@@ -65,10 +102,17 @@ def card_status(card_path: str, settings: Settings) -> CardStatus:
         for name in settings.default_folder_names
         if name not in {folder.name for folder in folders}
     ]
+    warnings = list(mount.warnings)
+    if wave.is_dir() and not mount.writable:
+        warnings.append("The official WAVE folder is present, but writes will fail until the card is remounted read-write.")
     return CardStatus(
         selected_path=str(root),
         exists=True,
-        writable=os.access(root, os.W_OK),
+        writable=mount.writable,
+        mount_readonly=mount.mount_readonly,
+        media_readonly=mount.media_readonly,
+        device=mount.device,
+        fstype=mount.fstype,
         wave_root=settings.wave_root,
         wave_path=str(wave),
         wave_ready=wave.is_dir(),
@@ -78,6 +122,7 @@ def card_status(card_path: str, settings: Settings) -> CardStatus:
         folders=folders,
         recommended_folders=settings.default_folder_names,
         missing_recommended=missing,
+        warnings=warnings,
     )
 
 
@@ -122,7 +167,7 @@ def list_samples(card_path: str, settings: Settings, logger: logging.Logger) -> 
 
 
 def create_folder(card_path: str, folder_name: str, settings: Settings, logger: logging.Logger) -> FolderInfo:
-    root = resolve_card_path(card_path)
+    root = ensure_writable(card_path, logger)
     wave = wave_directory(root, settings)
     if not wave.is_dir():
         raise SdCardError(f"{settings.wave_root} does not exist. Initialize the card first.")
@@ -195,6 +240,7 @@ def assert_folder_capacity(folder: Path, incoming_count: int, settings: Settings
 
 
 def delete_sample(card_path: str, folder: str, filename: str, settings: Settings, logger: logging.Logger) -> None:
+    ensure_writable(card_path, logger)
     target_folder = destination_folder(card_path, folder, settings)
     safe_name = Path(filename).name
     if not safe_name.lower().endswith(".wav"):
