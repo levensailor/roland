@@ -41,7 +41,7 @@ That layout matches the manual: files go in `Roland/TM-2/WAVE`, with at most one
 
 ## Prerequisites
 
-- Python 3.11 or newer
+- Python 3.10 or newer, including 3.14. The pinned FastAPI/Pydantic releases ship 3.14 wheels so you do not have to compile `pydantic-core`.
 - [ffmpeg](https://ffmpeg.org/) on your `PATH` (used for conversion)
 - An SD or SDHC card, 32 GB or smaller, formatted on the TM-2 the first time you use it
 

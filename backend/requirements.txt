@@ -1,6 +1,6 @@
-fastapi==0.115.6
-pydantic==2.10.4
-pydantic-settings==2.7.1
-uvicorn==0.34.0
-python-dotenv==1.0.1
-python-multipart==0.0.20
+fastapi==0.141.1
+pydantic==2.13.4
+pydantic-settings==2.15.0
+uvicorn==0.53.0
+python-dotenv==1.2.3
+python-multipart==0.0.32
