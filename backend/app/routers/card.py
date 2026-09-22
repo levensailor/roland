@@ -36,7 +36,7 @@ from app.services.sdcard import (
 
 
 def get_router(logger: logging.Logger) -> APIRouter:
-    router = APIRouter(prefix="/api")
+    router = APIRouter()
 
     def settings_dep() -> Settings:
         return get_settings()

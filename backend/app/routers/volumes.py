@@ -12,7 +12,7 @@ from app.services.volumes import list_volumes
 
 
 def get_router(logger: logging.Logger) -> APIRouter:
-    router = APIRouter(prefix="/api")
+    router = APIRouter()
 
     def settings_dep() -> Settings:
         return get_settings()

@@ -16,10 +16,49 @@ from app.services.converter import ffmpeg_available
 settings = get_settings()
 logger = configure_logging(settings)
 
-app = FastAPI(
+api = FastAPI(
     title=settings.app_name,
     description="Convert audio and write Roland TM-2 WAVE folders on a mounted SD card.",
     version="1.0.0",
+)
+
+
+@api.get("/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    available = ffmpeg_available(settings)
+    logger.info("Health check ffmpeg_available=%s", available)
+    return HealthResponse(
+        app_name=settings.app_name,
+        author=settings.app_author,
+        ffmpeg_available=available,
+        ffmpeg_binary=settings.ffmpeg_binary,
+    )
+
+
+api.include_router(volumes.get_router(logger))
+api.include_router(card.get_router(logger))
+api.include_router(samples.get_router(logger))
+
+
+@api.get("/routes", response_model=list[RouteInfo])
+def list_routes() -> list[RouteInfo]:
+    routes: list[RouteInfo] = []
+    for route in api.routes:
+        methods = sorted(getattr(route, "methods", []) or [])
+        path = getattr(route, "path", "")
+        name = getattr(route, "name", "")
+        for method in methods:
+            if method == "HEAD":
+                continue
+            routes.append(RouteInfo(method=method, path=f"/api{path}", name=name))
+    return sorted(routes, key=lambda item: (item.path, item.method))
+
+
+app = FastAPI(
+    title=settings.app_name,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 app.add_middleware(
@@ -44,37 +83,7 @@ async def reject_oversize_uploads(request: Request, call_next):
     return await call_next(request)
 
 
-@app.get("/api/health", response_model=HealthResponse)
-def health() -> HealthResponse:
-    available = ffmpeg_available(settings)
-    logger.info("Health check ffmpeg_available=%s", available)
-    return HealthResponse(
-        app_name=settings.app_name,
-        author=settings.app_author,
-        ffmpeg_available=available,
-        ffmpeg_binary=settings.ffmpeg_binary,
-    )
-
-
-app.include_router(volumes.get_router(logger))
-app.include_router(card.get_router(logger))
-app.include_router(samples.get_router(logger))
-
-
-@app.get("/api/routes", response_model=list[RouteInfo])
-def list_routes() -> list[RouteInfo]:
-    routes: list[RouteInfo] = []
-    for route in app.routes:
-        methods = sorted(getattr(route, "methods", []) or [])
-        path = getattr(route, "path", "")
-        name = getattr(route, "name", "")
-        if not path.startswith("/api"):
-            continue
-        for method in methods:
-            if method == "HEAD":
-                continue
-            routes.append(RouteInfo(method=method, path=path, name=name))
-    return sorted(routes, key=lambda item: (item.path, item.method))
+app.mount("/api", api)
 
 if settings.frontend_dir.exists():
     app.mount(
