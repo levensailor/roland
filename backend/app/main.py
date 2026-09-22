@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.logging_setup import configure_logging
 from app.models import HealthResponse, RouteInfo
-from app.routers import card, samples, volumes
+from app.routers import card, library, samples, volumes
 from app.services.converter import ffmpeg_available
 
 settings = get_settings()
@@ -38,19 +38,32 @@ def health() -> HealthResponse:
 api.include_router(volumes.get_router(logger))
 api.include_router(card.get_router(logger))
 api.include_router(samples.get_router(logger))
+api.include_router(library.get_router(logger))
 
 
 @api.get("/routes", response_model=list[RouteInfo])
 def list_routes() -> list[RouteInfo]:
     routes: list[RouteInfo] = []
-    for route in api.routes:
-        methods = sorted(getattr(route, "methods", []) or [])
-        path = getattr(route, "path", "")
-        name = getattr(route, "name", "")
-        for method in methods:
-            if method == "HEAD":
+
+    def walk(route_list) -> None:
+        for route in route_list:
+            original = getattr(route, "original_router", None)
+            if original is not None:
+                walk(original.routes)
                 continue
-            routes.append(RouteInfo(method=method, path=f"/api{path}", name=name))
+            nested = getattr(route, "routes", None)
+            if nested is not None and not getattr(route, "methods", None):
+                walk(nested)
+                continue
+            methods = sorted(getattr(route, "methods", []) or [])
+            path = getattr(route, "path", "") or ""
+            name = getattr(route, "name", "")
+            for method in methods:
+                if method == "HEAD":
+                    continue
+                routes.append(RouteInfo(method=method, path=f"/api{path}", name=name))
+
+    walk(api.routes)
     return sorted(routes, key=lambda item: (item.path, item.method))
 
 

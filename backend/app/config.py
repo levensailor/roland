@@ -48,6 +48,15 @@ class Settings(BaseSettings):
         default=".wav,.mp3,.aiff,.aif,.flac,.m4a,.aac,.ogg,.oga,.caf,.wma,.mp4"
     )
     cors_origins: str = Field(default="*")
+    freesound_api_key: str = Field(default="")
+    freesound_search_url: str = Field(default="https://freesound.org/apiv2/search/")
+    freesound_sound_url: str = Field(default="https://freesound.org/apiv2/sounds/")
+    archive_search_url: str = Field(default="https://archive.org/advancedsearch.php")
+    archive_metadata_url: str = Field(default="https://archive.org/metadata/")
+    archive_download_url: str = Field(default="https://archive.org/download/")
+    library_license_mode: str = Field(default="performance")
+    library_user_agent: str = Field(default="Roland-TM-2-Sample-Loader/1.0")
+    library_page_size: int = Field(default=24)
 
     @field_validator("default_channels")
     @classmethod
@@ -56,6 +65,15 @@ class Settings(BaseSettings):
         allowed = {"auto", "mono", "stereo"}
         if normalized not in allowed:
             raise ValueError(f"default_channels must be one of {sorted(allowed)}")
+        return normalized
+
+    @field_validator("library_license_mode")
+    @classmethod
+    def validate_license_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        allowed = {"performance", "any"}
+        if normalized not in allowed:
+            raise ValueError(f"library_license_mode must be one of {sorted(allowed)}")
         return normalized
 
     @property
@@ -102,6 +120,14 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def catalog_path(self) -> Path:
+        return BACKEND_ROOT / "app" / "library" / "catalog.json"
+
+    @property
+    def freesound_configured(self) -> bool:
+        return bool(self.freesound_api_key.strip())
 
 
 @lru_cache

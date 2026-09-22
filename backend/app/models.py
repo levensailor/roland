@@ -143,3 +143,60 @@ class RouteInfo(BaseModel):
     method: str
     path: str
     name: str
+
+
+class LibraryPreset(BaseModel):
+    folder: str
+    query: str
+    duration_min: float
+    duration_max: float
+    description: str
+
+
+class LibrarySourceInfo(BaseModel):
+    id: str
+    label: str
+    configured: bool
+    note: str
+
+
+class LibrarySourcesResponse(BaseModel):
+    license_mode: str
+    sources: list[LibrarySourceInfo]
+    presets: list[LibraryPreset]
+
+
+class LibraryHit(BaseModel):
+    id: str
+    source: str
+    name: str
+    license: str
+    license_url: str
+    author: str
+    duration_seconds: float | None = None
+    preview_url: str = ""
+    download_url: str = ""
+    download_kind: str
+    suggested_folder: str
+    commercial_ok: bool
+    tags: list[str] = []
+    note: str = ""
+
+
+class LibrarySearchResponse(BaseModel):
+    source: str
+    query: str
+    page: int
+    page_size: int
+    count: int
+    hits: list[LibraryHit]
+    warnings: list[str] = []
+
+
+class LibraryImportRequest(BaseModel):
+    card_path: str
+    folder: str = ""
+    source: str
+    id: str
+    channels: str = ""
+    remount: bool = True

@@ -10,6 +10,9 @@ const api = {
   samples: "/api/samples",
   upload: "/api/samples/upload",
   audio: "/api/samples/audio",
+  librarySources: "/api/library/sources",
+  librarySearch: "/api/library/search",
+  libraryImport: "/api/library/import",
 };
 
 const els = {
@@ -38,12 +41,30 @@ const els = {
   formatRules: document.getElementById("format-rules"),
   instructionSections: document.getElementById("instruction-sections"),
   errorCodes: document.getElementById("error-codes"),
+  librarySources: document.getElementById("library-sources"),
+  libraryPresets: document.getElementById("library-presets"),
+  libraryQuery: document.getElementById("library-query"),
+  libraryFolder: document.getElementById("library-folder"),
+  librarySearch: document.getElementById("library-search"),
+  libraryPrev: document.getElementById("library-prev"),
+  libraryNext: document.getElementById("library-next"),
+  libraryNote: document.getElementById("library-note"),
+  libraryRows: document.getElementById("library-rows"),
 };
 
 const state = {
   config: null,
   cardPath: "",
   busy: false,
+  library: {
+    source: "catalog",
+    page: 1,
+    pageSize: 24,
+    count: 0,
+    presets: [],
+    sources: [],
+    licenseMode: "performance",
+  },
 };
 
 function selectedFolder() {
@@ -434,6 +455,188 @@ function bindDropTarget(node, folderName) {
   });
 }
 
+async function loadLibrarySources() {
+  const payload = await readJson(await fetch(api.librarySources));
+  state.library.sources = payload.sources || [];
+  state.library.presets = payload.presets || [];
+  state.library.licenseMode = payload.license_mode || "performance";
+  renderLibrarySources();
+  renderLibraryPresets();
+  renderLibraryFolders();
+  const preferred =
+    state.library.sources.find((item) => item.id === "catalog") ||
+    state.library.sources.find((item) => item.configured);
+  if (preferred) {
+    state.library.source = preferred.id;
+    renderLibrarySources();
+  }
+  els.libraryNote.textContent = `License mode: ${state.library.licenseMode}. ${
+    preferred ? preferred.note : "No sources available."
+  }`;
+}
+
+function renderLibrarySources() {
+  els.librarySources.innerHTML = "";
+  state.library.sources.forEach((source) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip";
+    button.textContent = source.label;
+    button.disabled = !source.configured;
+    button.title = source.note;
+    button.classList.toggle("is-active", source.id === state.library.source);
+    button.addEventListener("click", () => {
+      state.library.source = source.id;
+      state.library.page = 1;
+      renderLibrarySources();
+      els.libraryNote.textContent = source.note;
+      run(searchLibrary);
+    });
+    els.librarySources.appendChild(button);
+  });
+}
+
+function renderLibraryPresets() {
+  els.libraryPresets.innerHTML = "";
+  state.library.presets.forEach((preset) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip";
+    button.textContent = preset.folder;
+    button.title = preset.description;
+    button.addEventListener("click", () => {
+      els.libraryQuery.value = preset.query;
+      els.libraryFolder.value = preset.folder;
+      if ([...els.folderSelect.options].some((option) => option.value === preset.folder)) {
+        els.folderSelect.value = preset.folder;
+        highlightSelectedFolder();
+      }
+      state.library.page = 1;
+      run(searchLibrary);
+    });
+    els.libraryPresets.appendChild(button);
+  });
+}
+
+function renderLibraryFolders() {
+  const folders = state.config?.default_folders || [];
+  els.libraryFolder.innerHTML = "";
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "Use suggested";
+  els.libraryFolder.appendChild(blank);
+  folders.forEach((name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    els.libraryFolder.appendChild(option);
+  });
+}
+
+async function searchLibrary() {
+  const params = new URLSearchParams({
+    q: els.libraryQuery.value.trim(),
+    folder: els.libraryFolder.value || "",
+    source: state.library.source,
+    page: String(state.library.page),
+  });
+  els.libraryNote.textContent = `Searching ${state.library.source}…`;
+  const payload = await readJson(await fetch(`${api.librarySearch}?${params}`));
+  state.library.page = payload.page;
+  state.library.pageSize = payload.page_size;
+  state.library.count = payload.count;
+  const warnings = (payload.warnings || []).join(" ");
+  els.libraryNote.textContent = `${payload.count} hit(s) from ${payload.source}. Page ${payload.page}.${
+    warnings ? ` ${warnings}` : ""
+  }`;
+  renderLibraryHits(payload.hits || []);
+}
+
+function renderLibraryHits(hits) {
+  els.libraryRows.innerHTML = "";
+  if (!hits.length) {
+    els.libraryRows.innerHTML = `<tr><td colspan="5">No samples matched. Try Catalog or another query.</td></tr>`;
+    return;
+  }
+  hits.forEach((hit) => {
+    const row = document.createElement("tr");
+    const licenseClass = hit.commercial_ok ? "badge--ok" : "badge--bad";
+    const kindLabel =
+      hit.download_kind === "preview"
+        ? "preview→WAV"
+        : hit.download_kind === "direct"
+          ? "direct WAV"
+          : hit.download_kind;
+    row.innerHTML = `
+      <td>
+        <strong>${escapeHtml(hit.name)}</strong>
+        <div class="note">${escapeHtml(hit.suggested_folder)}${
+          hit.duration_seconds != null ? ` · ${hit.duration_seconds.toFixed(2)}s` : ""
+        }${hit.note ? ` · ${escapeHtml(hit.note)}` : ""}</div>
+      </td>
+      <td>
+        <span class="badge ${licenseClass}">${escapeHtml(hit.license || "unknown")}</span>
+        ${hit.commercial_ok ? "" : '<div class="note">NC — not for paid gigs</div>'}
+      </td>
+      <td>${escapeHtml(hit.author || "—")}</td>
+      <td>${escapeHtml(kindLabel)}</td>
+      <td class="library-actions"></td>
+    `;
+    const actions = row.querySelector(".library-actions");
+    if (hit.preview_url) {
+      const play = document.createElement("button");
+      play.type = "button";
+      play.className = "btn";
+      play.textContent = "Play";
+      play.addEventListener("click", () => {
+        els.preview.src = hit.preview_url;
+        els.preview.play().catch(() => {
+          els.libraryNote.textContent = "Browser blocked autoplay. Use the audio bar.";
+        });
+      });
+      actions.appendChild(play);
+    }
+    const write = document.createElement("button");
+    write.type = "button";
+    write.className = "btn btn--signal";
+    write.textContent = "Write to card";
+    write.addEventListener("click", () => run(() => importLibraryHit(hit)));
+    actions.appendChild(write);
+    els.libraryRows.appendChild(row);
+  });
+}
+
+async function importLibraryHit(hit) {
+  requireCard();
+  if (state.busy) {
+    throw new Error("A conversion is already running.");
+  }
+  const folder = els.libraryFolder.value || hit.suggested_folder || selectedFolder();
+  state.busy = true;
+  els.libraryNote.textContent = `Importing ${hit.name} → ${folder || "WAVE root"}…`;
+  try {
+    const result = await readJson(
+      await fetch(api.libraryImport, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card_path: state.cardPath,
+          folder,
+          source: hit.source,
+          id: hit.id,
+          channels: els.channelSelect.value,
+          remount: true,
+        }),
+      })
+    );
+    els.jobStatus.textContent = `${result.message} Saved ${result.saved_name}. Assign with INST on the TM-2.`;
+    els.libraryNote.textContent = `Wrote ${result.saved_name} from ${hit.source}. License: ${hit.license}.`;
+    await refreshCard();
+  } finally {
+    state.busy = false;
+  }
+}
+
 function bindUi() {
   els.volumeSelect.addEventListener("change", async () => {
     if (!els.volumeSelect.value) {
@@ -472,6 +675,32 @@ function bindUi() {
     }
   });
 
+  els.librarySearch.addEventListener("click", () => {
+    state.library.page = 1;
+    run(searchLibrary);
+  });
+  els.libraryQuery.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      state.library.page = 1;
+      run(searchLibrary);
+    }
+  });
+  els.libraryPrev.addEventListener("click", () => {
+    if (state.library.page <= 1) {
+      return;
+    }
+    state.library.page -= 1;
+    run(searchLibrary);
+  });
+  els.libraryNext.addEventListener("click", () => {
+    const maxPage = Math.max(1, Math.ceil(state.library.count / state.library.pageSize));
+    if (state.library.page >= maxPage) {
+      return;
+    }
+    state.library.page += 1;
+    run(searchLibrary);
+  });
+
   bindDropTarget(els.dropzone);
 }
 
@@ -480,6 +709,9 @@ async function run(task) {
     await task();
   } catch (error) {
     els.jobStatus.textContent = error.message;
+    if (els.libraryNote) {
+      els.libraryNote.textContent = error.message;
+    }
   }
 }
 
@@ -487,4 +719,6 @@ bindUi();
 run(async () => {
   await loadConfig();
   await loadVolumes();
+  await loadLibrarySources();
+  await searchLibrary();
 });

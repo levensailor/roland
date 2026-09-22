@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "source": "catalog",
+  "title": "Curated CC0 percussion for TM-2",
+  "description": "Selected one-shots from the Versilian Community Sample Library (VCSL). CC0 public domain. Safe for paid live gigs.",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "author": "Versilian Studios / VCSL contributors",
+  "pack_url": "https://github.com/sgossner/VCSL",
+  "base_url": "https://raw.githubusercontent.com/sgossner/VCSL/master/",
+  "samples": [
+    {
+      "id": "vcsl-kick-1",
+      "name": "Bass Drum 1 Hit",
+      "path": "Membranophones/Struck Membranophones/Bass Drum 1/BDrumNew_hit_v2_rr1_Sum.wav",
+      "suggested_folder": "Kicks",
+      "tags": ["kick", "bassdrum", "one-shot"]
+    },
+    {
+      "id": "vcsl-kick-2",
+      "name": "Bass Drum 2 Hit",
+      "path": "Membranophones/Struck Membranophones/Bass Drum 2/bassdrum_hit_mf1.wav",
+      "suggested_folder": "Kicks",
+      "tags": ["kick", "bassdrum", "one-shot"]
+    },
+    {
+      "id": "vcsl-snare-modern-1",
+      "name": "Snare Modern 1 Hit",
+      "path": "Membranophones/Struck Membranophones/Snare Drum, Modern 1/Snare2_HitNS_v2_rr1_Mid.wav",
+      "suggested_folder": "Snares",
+      "tags": ["snare", "one-shot"]
+    },
+    {
+      "id": "vcsl-snare-modern-2",
+      "name": "Snare Modern 2 Hit",
+      "path": "Membranophones/Struck Membranophones/Snare Drum, Modern 2/Snare3M_HitNS_v2_rr1_Mid.wav",
+      "suggested_folder": "Snares",
+      "tags": ["snare", "one-shot"]
+    },
+    {
+      "id": "vcsl-snare-modern-3",
+      "name": "Snare Modern 3 Hit",
+      "path": "Membranophones/Struck Membranophones/Snare Drum, Modern 3/Snare4_HitSN_v2_rr1_Mid.wav",
+      "suggested_folder": "Snares",
+      "tags": ["snare", "one-shot"]
+    },
+    {
+      "id": "vcsl-snare-legacy",
+      "name": "Legacy Snare Hit",
+      "path": "Membranophones/Struck Membranophones/Legacy Snares/OldSnare/snare_mf1.wav",
+      "suggested_folder": "Snares",
+      "tags": ["snare", "one-shot"]
+    },
+    {
+      "id": "vcsl-tom-high",
+      "name": "Tom High Stick",
+      "path": "Membranophones/Struck Membranophones/Tom 1/Stick/TomH_HitS_v2_rr1_Mid.wav",
+      "suggested_folder": "Toms",
+      "tags": ["tom", "one-shot"]
+    },
+    {
+      "id": "vcsl-tom-low",
+      "name": "Tom Low Stick",
+      "path": "Membranophones/Struck Membranophones/Tom 2/Stick/TomL_HitS_v2_rr1_Mid.wav",
+      "suggested_folder": "Toms",
+      "tags": ["tom", "one-shot"]
+    },
+    {
+      "id": "vcsl-tom-tenor-high",
+      "name": "Legacy Tenor High",
+      "path": "Membranophones/Struck Membranophones/Legacy Toms/tenor_higher/tenorH_mf_rr1.wav",
+      "suggested_folder": "Toms",
+      "tags": ["tom", "tenor", "one-shot"]
+    },
+    {
+      "id": "vcsl-hat-closed",
+      "name": "Hi-Hat Closed",
+      "path": "Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitC_v2_rr1_Mid.wav",
+      "suggested_folder": "Hats",
+      "tags": ["hihat", "closed", "one-shot"]
+    },
+    {
+      "id": "vcsl-hat-open",
+      "name": "Hi-Hat Open",
+      "path": "Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitO_rr1_Mid.wav",
+      "suggested_folder": "Hats",
+      "tags": ["hihat", "open", "one-shot"]
+    },
+    {
+      "id": "vcsl-hat-close-pedal",
+      "name": "Hi-Hat Pedal Close",
+      "path": "Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_Close_rr1_Mid.wav",
+      "suggested_folder": "Hats",
+      "tags": ["hihat", "pedal", "one-shot"]
+    },
+    {
+      "id": "vcsl-crash-1",
+      "name": "Clash Cymbal 1",
+      "path": "Idiophones/Struck Idiophones/Clash Cymbals 1/cymbal_crash1_mf1.wav",
+      "suggested_folder": "Cymbals",
+      "tags": ["crash", "cymbal", "one-shot"]
+    },
+    {
+      "id": "vcsl-crash-2",
+      "name": "Clash Cymbal 2",
+      "path": "Idiophones/Struck Idiophones/Clash Cymbals 2/cymbal_crash2_f1.wav",
+      "suggested_folder": "Cymbals",
+      "tags": ["crash", "cymbal", "one-shot"]
+    },
+    {
+      "id": "vcsl-sus-cymbal",
+      "name": "Suspended Cymbal Hit",
+      "path": "Idiophones/Struck Idiophones/Suspended Cymbal 2/susCymb2_hit_mf1.wav",
+      "suggested_folder": "Cymbals",
+      "tags": ["cymbal", "suspended", "one-shot"]
+    },
+    {
+      "id": "vcsl-cowbell",
+      "name": "Cowbell Hit",
+      "path": "Idiophones/Struck Idiophones/Cowbells/Cowbell1_Hit_v2_rr1_Mid.wav",
+      "suggested_folder": "Perc",
+      "tags": ["cowbell", "perc", "one-shot"]
+    },
+    {
+      "id": "vcsl-claves",
+      "name": "Claves Hit",
+      "path": "Idiophones/Struck Idiophones/Claves/Claves1_Hit_v2_rr1_Mid.wav",
+      "suggested_folder": "Perc",
+      "tags": ["claves", "perc", "one-shot"]
+    },
+    {
+      "id": "vcsl-tamb",
+      "name": "Tambourine Hit",
+      "path": "Idiophones/Struck Idiophones/Tambourine 1/Tamb1_Hit_v2_rr1_Mid.wav",
+      "suggested_folder": "Perc",
+      "tags": ["tambourine", "perc", "one-shot"]
+    },
+    {
+      "id": "vcsl-woodblock",
+      "name": "Woodblock Click",
+      "path": "Idiophones/Struck Idiophones/Woodblock/wood_click2_mp.wav",
+      "suggested_folder": "Perc",
+      "tags": ["woodblock", "perc", "one-shot"]
+    },
+    {
+      "id": "vcsl-gong",
+      "name": "Gong Hit",
+      "path": "Idiophones/Struck Idiophones/Gong 1/gong_mf.wav",
+      "suggested_folder": "FX",
+      "tags": ["gong", "fx", "one-shot"]
+    },
+    {
+      "id": "vcsl-agogo",
+      "name": "Agogo High",
+      "path": "Idiophones/Struck Idiophones/Agogo Bells/Agogo_High_v2_rr1_Mid.wav",
+      "suggested_folder": "FX",
+      "tags": ["agogo", "fx", "one-shot"]
+    }
+  ]
+}

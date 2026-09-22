@@ -125,8 +125,55 @@
             </div>
             <audio id="preview" controls class="preview"></audio>
           </article>
-        </section>
 
+          <article class="panel" id="library-panel">
+            <header class="panel__head">
+              <h2>04 / Public library</h2>
+              <p>
+                Browse CC0 / CC-BY one-shots for live pads. Default mode hides NC licenses so paid gigs stay clean.
+                Imported files still need INST assignment on the TM-2.
+              </p>
+            </header>
+            <div class="controls">
+              <div id="library-sources" class="chip-row" role="tablist" aria-label="Library sources"></div>
+            </div>
+            <div class="controls">
+              <div id="library-presets" class="chip-row" aria-label="Folder presets"></div>
+            </div>
+            <div class="controls">
+              <label class="field field--grow">
+                <span>Search</span>
+                <input id="library-query" type="text" autocomplete="off" placeholder="kick drum one-shot" />
+              </label>
+              <label class="field">
+                <span>Write folder</span>
+                <select id="library-folder"></select>
+              </label>
+              <button id="library-search" type="button" class="btn btn--signal">Search</button>
+              <button id="library-prev" type="button" class="btn">Prev</button>
+              <button id="library-next" type="button" class="btn">Next</button>
+            </div>
+            <p id="library-note" class="note">Pick Catalog for offline CC0 VCSL hits, or set FREESOUND_API_KEY for Freesound.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>License</th>
+                    <th>Author</th>
+                    <th>Kind</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="library-rows">
+                  <tr>
+                    <td colspan="5">Search a source to list samples.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
         <aside class="manual" id="manual">
           <p class="manual__banner">READ THIS EVERY TIME</p>
           <h2>How to load samples on the TM-2</h2>
