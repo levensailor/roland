@@ -1,0 +1,106 @@
+# Roland TM-2 Sample Loader
+
+A local full-stack tool that converts audio to Roland TM-2-legal WAV files and writes them to a mounted SD card in the official `Roland/TM-2/WAVE` folder tree.
+
+The TM-2 only plays 44.1 kHz, 16-bit, mono or stereo PCM WAV files. DAW metadata can still trigger a `FORMAT` error. This app converts dropped files (WAV, MP3, AIFF, FLAC, M4A, OGG, and similar), strips tags, and keeps one folder level under `WAVE` so the module can see the sounds.
+
+## Author
+
+levensailor
+
+## Public assets and references
+
+- App UI: `http://localhost:8080` after you start the backend on the machine that has the SD card mounted
+- [Roland TM-2 product page](https://www.roland.com/us/products/tm-2/)
+- [TM-2 owner's manual (PDF)](https://static.roland.com/assets/media/pdf/TM-2_eng04_W.pdf)
+- [Roland support: notes on playing WAV files from an SD card](https://support.roland.com/hc/en-us/articles/201920029-TM-2-Notes-Regarding-Playing-Audio-WAV-Files-from-an-SD-Card)
+
+## Login
+
+There is no login. The app is meant to run on the computer attached to the SD card reader. Do not expose it to the public internet.
+
+## What it writes
+
+```text
+<SD card root>/
+  Roland/
+    TM-2/
+      WAVE/
+        Kicks/
+        Snares/
+        Toms/
+        Hats/
+        Cymbals/
+        Perc/
+        FX/
+        Loops/
+        Tracks/
+```
+
+That layout matches the manual: files go in `Roland/TM-2/WAVE`, with at most one folder level underneath, 300 folders max, and 300 files per folder. Names are forced to ASCII.
+
+## Prerequisites
+
+- Python 3.11 or newer
+- [ffmpeg](https://ffmpeg.org/) on your `PATH` (used for conversion)
+- An SD or SDHC card, 32 GB or smaller, formatted on the TM-2 the first time you use it
+
+macOS ffmpeg install:
+
+```bash
+brew install ffmpeg
+```
+
+## Run the app
+
+From the repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+cp .env.example .env
+```
+
+Optional: set `SDCARD_PATH` in `.env` to the mounted card, for example `/Volumes/NO NAME`.
+
+Start the API and the brutalist web UI. Host and port come from `.env` (`HOST`, `PORT`):
+
+```bash
+cd backend
+python -m app.main
+```
+
+Equivalent uvicorn command:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+
+Open [http://localhost:8080](http://localhost:8080).
+
+1. Insert the SD card into this computer with the TM-2 powered off.
+2. Select the volume or paste its path.
+3. Click **Init WAVE tree**.
+4. Drag audio onto a folder tile.
+5. Eject the card, insert it with the TM-2 off, then assign files on the module with `INST` and `SHIFT` + `-` / `+` to reach the SD list.
+
+The right-hand **READ THIS EVERY TIME** panel repeats the pad-assignment steps. The TM-2 does not copy samples into internal memory. The card must stay inserted or the display shows `NO CARD`.
+
+## Configuration
+
+Copy `.env.example` to `.env`. All names, ports, folder labels, sample-rate limits, and log paths come from those variables. Logs write to the console and to a rotating file (`1 MB`, 3 backups) with an America/New_York timestamp, function name, and line number.
+
+## Deployment
+
+Run this on the workstation that mounts the SD card. A remote host cannot see a card plugged into your desk.
+
+If you still want a small always-on box on the same bench as the card reader, a free-tier EC2 instance with a public IP, a security group that opens SSH and HTTPS, and the steps above is enough. Harden later. Point the instance at a locally attached reader; do not expect a cloud VM to write a card that is in your laptop.
+
+## Project layout
+
+- `backend/` — FastAPI, conversion, SD card writes
+- `frontend/` — drag-and-drop UI and TM-2 reminders
+- `CHANGELOG.md` — dated feature list
+- `CONTRIBUTING.md` — feature-branch and pull-request process

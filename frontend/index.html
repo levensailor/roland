@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Roland TM-2 Sample Loader</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="mast">
+        <div class="mast__mark">
+          <p class="eyebrow">UNIT / TM-2 / WAVE WRITER</p>
+          <h1 id="app-title">Roland TM-2 Sample Loader</h1>
+          <p class="mast__sub">
+            Convert any audio to 44.1 kHz / 16-bit PCM WAV, strip tags that cause FORMAT errors,
+            and write the official <code>Roland/TM-2/WAVE</code> layout.
+          </p>
+        </div>
+        <dl class="status-board">
+          <div>
+            <dt>FFMPEG</dt>
+            <dd id="ffmpeg-status">CHECKING</dd>
+          </div>
+          <div>
+            <dt>CARD</dt>
+            <dd id="card-status">NONE</dd>
+          </div>
+          <div>
+            <dt>WAVE</dt>
+            <dd id="wave-status">—</dd>
+          </div>
+          <div>
+            <dt>FILES</dt>
+            <dd id="file-count">0</dd>
+          </div>
+        </dl>
+      </header>
+
+      <main class="layout">
+        <section class="work">
+          <article class="panel">
+            <header class="panel__head">
+              <h2>01 / Mounted SD card</h2>
+              <p>Pick the volume after you insert the card in this computer. Power the TM-2 off first.</p>
+            </header>
+            <div class="card-row">
+              <label class="field">
+                <span>Detected volumes</span>
+                <select id="volume-select">
+                  <option value="">Scan volumes…</option>
+                </select>
+              </label>
+              <label class="field field--grow">
+                <span>Or paste a path</span>
+                <input id="card-path" type="text" autocomplete="off" placeholder="/Volumes/NO NAME" />
+              </label>
+              <button id="refresh-volumes" type="button" class="btn">Rescan</button>
+              <button id="init-card" type="button" class="btn btn--signal">Init WAVE tree</button>
+            </div>
+            <p id="card-note" class="note">No card selected.</p>
+          </article>
+
+          <article class="panel drop-panel" id="drop-panel">
+            <header class="panel__head">
+              <h2>02 / Drop samples</h2>
+              <p>Drag files onto the slab or onto a folder tile. Conversion is automatic.</p>
+            </header>
+            <div class="controls">
+              <label class="field">
+                <span>Destination folder</span>
+                <select id="folder-select"></select>
+              </label>
+              <label class="field">
+                <span>Channels</span>
+                <select id="channel-select">
+                  <option value="stereo">Stereo (loops / tracks)</option>
+                  <option value="mono">Mono (one-shots)</option>
+                  <option value="auto">Keep source if 1 or 2 ch</option>
+                </select>
+              </label>
+              <label class="field field--grow">
+                <span>New folder name</span>
+                <input id="new-folder" type="text" maxlength="32" placeholder="Kicks" />
+              </label>
+              <button id="create-folder" type="button" class="btn">Create folder</button>
+              <label class="btn btn--ghost file-btn">
+                Browse files
+                <input id="file-input" type="file" multiple accept="audio/*,.wav,.mp3,.aiff,.aif,.flac,.m4a,.ogg,.caf,.wma" />
+              </label>
+            </div>
+            <div id="dropzone" class="dropzone" tabindex="0">
+              <p class="dropzone__stamp">DROP AUDIO</p>
+              <p class="dropzone__hint">
+                WAV MP3 AIFF FLAC M4A OGG CAF WMA &rarr; clean 16-bit / 44.1 kHz WAV
+              </p>
+            </div>
+            <p id="job-status" class="note">Idle. Waiting for files.</p>
+            <div id="folder-grid" class="folder-grid"></div>
+          </article>
+
+          <article class="panel">
+            <header class="panel__head">
+              <h2>03 / Files on card</h2>
+              <p>These names are what the TM-2 lists after internal instruments.</p>
+            </header>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Folder</th>
+                    <th>File</th>
+                    <th>Format</th>
+                    <th>Time</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="sample-rows">
+                  <tr>
+                    <td colspan="5">Initialize a card to see samples.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <audio id="preview" controls class="preview"></audio>
+          </article>
+        </section>
+
+        <aside class="manual" id="manual">
+          <p class="manual__banner">READ THIS EVERY TIME</p>
+          <h2>How to load samples on the TM-2</h2>
+          <p class="manual__lede">
+            The module does not copy WAVs into internal memory. It plays them from the SD card.
+            If you skip a step you get NO CARD, NO WAVE, or FORMAT.
+          </p>
+
+          <section>
+            <h3>Legal file</h3>
+            <ul id="format-rules">
+              <li>WAV only: 44.1 kHz, 16-bit, mono or stereo.</li>
+              <li>Path must be <code>Roland/TM-2/WAVE</code>. One folder level under WAVE. 300 folders, 300 files each.</li>
+              <li>ASCII names. No Japanese or other double-byte characters.</li>
+              <li>SD or SDHC, 32 GB or smaller. Format the card on the TM-2 the first time.</li>
+            </ul>
+          </section>
+
+          <div id="instruction-sections">
+            <section>
+              <h3>1. Format a new card on the TM-2</h3>
+              <ol>
+                <li>Insert the card with power off, then turn the TM-2 on. Use a card you keep only for this module.</li>
+                <li>Hold <kbd>SHIFT</kbd> + <kbd>INST</kbd>. Select <strong>SD CARD FORMAT</strong>, press <kbd>+</kbd>, confirm with <kbd>+</kbd>, then press <kbd>TRIG IN 2</kbd>.</li>
+                <li>Power off before you pull the card. Hot-swap can corrupt it.</li>
+              </ol>
+            </section>
+            <section>
+              <h3>2. Write with this app</h3>
+              <ol>
+                <li>Mount the card here and press <strong>Init WAVE tree</strong>.</li>
+                <li>Drop audio onto a folder. This app converts and strips DAW tags.</li>
+                <li>Eject the card. Insert it with the TM-2 powered off. Leave it in during play.</li>
+              </ol>
+            </section>
+            <section>
+              <h3>3. Assign a WAV to a pad</h3>
+              <ol>
+                <li>Use <kbd>-</kbd> <kbd>+</kbd> to pick a kit.</li>
+                <li>Press <kbd>INST</kbd>. Strike the pad, or press <kbd>TRIG IN 1</kbd> / <kbd>2</kbd>. <kbd>SHIFT</kbd> + TRIG IN selects the rim.</li>
+                <li>Hold <kbd>SHIFT</kbd> + <kbd>-</kbd>/<kbd>+</kbd> to jump from INT to SD and between folders. Then <kbd>-</kbd> <kbd>+</kbd> to the file.</li>
+                <li>Strike to audition. Press <kbd>INST</kbd> to return. The kit saves automatically.</li>
+              </ol>
+            </section>
+            <section>
+              <h3>4. If you rename or move a file</h3>
+              <ol>
+                <li>The pad path breaks and the screen shows <strong>NO WAVE</strong>. Assign the file again.</li>
+              </ol>
+            </section>
+          </div>
+
+          <section>
+            <h3>Screen messages</h3>
+            <dl id="error-codes" class="codes">
+              <div><dt>FORMAT</dt><dd>Wrong type or leftover tags. Re-save through this app.</dd></div>
+              <div><dt>NO WAVE</dt><dd>File missing or renamed. Reassign the pad.</dd></div>
+              <div><dt>NO CARD</dt><dd>Card not inserted. Samples will not play.</dd></div>
+              <div><dt>SD CARD LOCKED</dt><dd>Slide the lock switch off before writing.</dd></div>
+            </dl>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="colophon">
+        <p>
+          <span id="app-author">levensailor</span>
+          · Local tool. No login.
+          · Official refs:
+          <a href="https://static.roland.com/assets/media/pdf/TM-2_eng04_W.pdf" target="_blank" rel="noreferrer">TM-2 owner's manual</a>
+          ·
+          <a href="https://support.roland.com/hc/en-us/articles/201920029-TM-2-Notes-Regarding-Playing-Audio-WAV-Files-from-an-SD-Card" target="_blank" rel="noreferrer">Roland WAV notes</a>
+        </p>
+      </footer>
+    </div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
