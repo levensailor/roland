@@ -356,17 +356,24 @@ async function initCard() {
 
 async function remountCard() {
   requireCard();
-  const status = await readJson(
-    await fetch(api.cardRemount, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ card_path: state.cardPath }),
-    })
-  );
-  els.jobStatus.textContent = status.writable
-    ? `Remounted ${status.selected_path} read-write.`
-    : (status.warnings || []).join(" ") || "Card is still read-only.";
-  await refreshCard();
+  try {
+    const status = await readJson(
+      await fetch(api.cardRemount, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_path: state.cardPath }),
+      })
+    );
+    els.jobStatus.textContent = status.writable
+      ? `Remounted ${status.selected_path} read-write.`
+      : (status.warnings || []).join(" ") || "Card is still read-only.";
+    els.cardNote.textContent = els.jobStatus.textContent;
+    await refreshCard();
+  } catch (error) {
+    els.jobStatus.textContent = error.message;
+    els.cardNote.textContent = error.message;
+    throw error;
+  }
 }
 
 async function createFolder() {

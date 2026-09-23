@@ -82,7 +82,7 @@ Open [http://localhost:8080](http://localhost:8080).
 
 1. Insert the SD card into this computer with the TM-2 powered off.
 2. Select the volume or paste its path.
-3. Click **Init WAVE tree**. If the badge says READ-ONLY, macOS mounted a dirty FAT (usually from pulling the card while the TM-2 was on). Use **Remount RW**, or eject and reinsert. The lock switch is a different problem (`Media Read-Only`).
+3. Click **Init WAVE tree**. If the badge says READ-ONLY, macOS mounted a dirty FAT (usually from pulling the card while the TM-2 was on). **Remount RW** cannot flip FSKit mounts — eject in Finder, run Disk Utility First Aid on the TM-2 volume, reinsert, then keep the TM-2 powered off when you remove the card. The plastic lock switch is a different problem (`Media Read-Only`).
 4. Drag audio onto a folder tile, or use **04 / Public library** to search curated CC0 packs, Freesound, Internet Archive, or Waves Local and write them to the card.
 5. Eject the card, insert it with the TM-2 off, then assign files on the module with `INST` and `SHIFT` + `-` / `+` to reach the SD list.
 

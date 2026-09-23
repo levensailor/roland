@@ -43,9 +43,9 @@ def inspect_mount(path: Path, logger: logging.Logger) -> MountState:
         )
     elif state.mount_readonly:
         state.warnings.append(
-            "macOS mounted this card read-only, usually after it was pulled while the TM-2 was still on. "
-            "Power the TM-2 off before removing the card, then eject and remount here. "
-            "Init will try a read-write remount without unmounting."
+            "macOS mounted this card read-only (dirty FAT from a hot eject). "
+            "Remount RW cannot flip FSKit mounts — eject in Finder, run Disk Utility First Aid, "
+            "reinsert, and keep the TM-2 powered off when you remove the card."
         )
     elif not access_ok:
         state.warnings.append("This path is not writable by the current user.")
@@ -68,15 +68,27 @@ def remount_read_write(path: Path, logger: logging.Logger) -> MountState:
     logger.info("Attempting read-write remount: %s", " ".join(command))
     completed = subprocess.run(command, capture_output=True, text=True, check=False)
     after = inspect_mount(path, logger)
-    if completed.returncode != 0 or not after.writable:
-        detail = (completed.stderr or completed.stdout or "remount failed").strip()
-        logger.info("Remount did not make %s writable: %s", path, detail)
-        raise RuntimeError(
-            f"Could not remount {path} read-write ({detail}). "
-            "Eject the card in Finder, reinsert it, or repair the FAT volume after a dirty TM-2 eject."
-        )
-    logger.info("Remounted %s read-write on %s", path, after.device)
-    return after
+    if completed.returncode == 0 and after.writable:
+        logger.info("Remounted %s read-write on %s", path, after.device)
+        return after
+
+    detail = (completed.stderr or completed.stdout or "remount failed").strip()
+    logger.info("Remount did not make %s writable: %s", path, detail)
+    raise RuntimeError(_readonly_recovery_message(path, before, detail))
+
+
+def _readonly_recovery_message(path: Path, state: MountState, detail: str) -> str:
+    device = state.device or "the SD device"
+    return (
+        f"Could not remount {path} read-write ({detail}). "
+        "This is not the plastic lock switch — macOS mounted a dirty FAT volume read-only "
+        "(usually after pulling the card while the TM-2 was still powered on). "
+        f"Do this: 1) Eject {path} in Finder (or physically remove and reinsert the card). "
+        "2) Open Disk Utility → select the TM-2 volume → First Aid. "
+        f"Or in Terminal: diskutil unmount {path} && diskutil repairVolume {device} && diskutil mount {device}. "
+        "3) Power the TM-2 off before removing the card next time. "
+        "Remount RW never unmounts for you — a failed remount must leave the card visible."
+    )
 
 
 def write_blocked_message(state: MountState) -> str:
