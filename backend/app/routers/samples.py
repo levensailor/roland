@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from app.config import Settings, get_settings
 from app.errors import card_http_error, http_error
 from app.models import UploadResponse, UploadResult
-from app.services.converter import ConversionError, convert_to_tm2_wav
+from app.services.converter import ConversionError, convert_to_tm2_wav, local_scratch_dir, remove_appledouble_sidecar
 from app.services.sdcard import (
     SdCardError,
     assert_folder_capacity,
@@ -54,6 +54,9 @@ def get_router(logger: logging.Logger) -> APIRouter:
 
         for upload in files:
             original_name = upload.filename or "sample"
+            if Path(original_name).name.startswith("."):
+                logger.info("Skipping hidden file %s", original_name)
+                continue
             suffix = Path(original_name).suffix.lower()
             if suffix not in settings.allowed_extension_set:
                 errors.append(f"{original_name}: unsupported type {suffix or '(none)'}")
@@ -71,6 +74,7 @@ def get_router(logger: logging.Logger) -> APIRouter:
                 with tempfile.NamedTemporaryFile(
                     prefix="tm2_upload_",
                     suffix=suffix or ".bin",
+                    dir=local_scratch_dir(target_folder),
                     delete=False,
                 ) as temp_handle:
                     temp_handle.write(payload)
@@ -86,6 +90,7 @@ def get_router(logger: logging.Logger) -> APIRouter:
                     )
                 finally:
                     temp_path.unlink(missing_ok=True)
+                    remove_appledouble_sidecar(temp_path, logger)
 
                 results.append(
                     UploadResult(

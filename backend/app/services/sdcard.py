@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.models import CardStatus, FolderInfo, SampleInfo
-from app.services.converter import inspect_wav
+from app.services.converter import inspect_wav, strip_card_metadata
 from app.services.mounts import inspect_mount, remount_read_write, write_blocked_message
 
 
@@ -74,12 +74,14 @@ def initialize_card(
     if mount.writable:
         try:
             wave.mkdir(parents=True, exist_ok=True)
+            strip_card_metadata(wave, logger)
             logger.info("Ensured WAVE root at %s", wave)
             if create_recommended:
                 for folder_name in settings.default_folder_names:
                     safe_name = sanitize_name(folder_name, settings.max_filename_length)
                     target = wave / safe_name
                     target.mkdir(exist_ok=True)
+                    strip_card_metadata(target, logger)
                     logger.info("Ensured recommended folder %s", target)
         except OSError as exc:
             raise SdCardError(f"Could not write {settings.wave_root}: {exc}") from exc
@@ -127,6 +129,7 @@ def card_status(card_path: str, settings: Settings, logger: logging.Logger) -> C
 
 
 def list_folders(wave: Path, settings: Settings) -> list[FolderInfo]:
+    strip_card_metadata(wave)
     folders = [
         FolderInfo(
             name=ROOT_FOLDER_LABEL,
@@ -140,6 +143,7 @@ def list_folders(wave: Path, settings: Settings) -> list[FolderInfo]:
         key=lambda item: item.name.lower(),
     )
     for child in children:
+        strip_card_metadata(child)
         count = _wav_count(child)
         folders.append(
             FolderInfo(
@@ -184,6 +188,7 @@ def create_folder(card_path: str, folder_name: str, settings: Settings, logger: 
     if target.exists():
         raise SdCardError(f"Folder {safe_name} already exists.")
     target.mkdir()
+    strip_card_metadata(target, logger)
     logger.info("Created folder %s", target)
     return FolderInfo(
         name=safe_name,
@@ -252,6 +257,7 @@ def delete_sample(card_path: str, folder: str, filename: str, settings: Settings
     if not target.exists():
         raise SdCardError(f"{safe_name} was not found.")
     target.unlink()
+    strip_card_metadata(target, logger)
     logger.info("Deleted sample %s", target)
 
 
@@ -265,7 +271,11 @@ def sanitize_name(value: str, max_length: int) -> str:
 
 
 def _wav_count(folder: Path) -> int:
-    return sum(1 for child in folder.iterdir() if child.is_file() and child.suffix.lower() == ".wav")
+    return sum(1 for child in folder.iterdir() if _is_sample_wav(child))
+
+
+def _is_sample_wav(path: Path) -> bool:
+    return path.is_file() and path.suffix.lower() == ".wav" and not path.name.startswith(".")
 
 
 def _samples_in_folder(
@@ -276,7 +286,7 @@ def _samples_in_folder(
 ) -> list[SampleInfo]:
     samples: list[SampleInfo] = []
     for child in sorted(folder.iterdir(), key=lambda item: item.name.lower()):
-        if not child.is_file() or child.suffix.lower() != ".wav":
+        if not _is_sample_wav(child):
             continue
         info = {
             "sample_rate": None,
@@ -301,4 +311,5 @@ def _samples_in_folder(
                 duration_seconds=info["duration_seconds"],
             )
         )
+    strip_card_metadata(folder, logger)
     return samples

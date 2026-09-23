@@ -15,7 +15,12 @@ from pathlib import Path
 
 from app.config import Settings
 from app.models import LibraryHit, LibraryPreset, LibrarySearchResponse, LibrarySourceInfo
-from app.services.converter import ConversionError, convert_to_tm2_wav
+from app.services.converter import (
+    ConversionError,
+    convert_to_tm2_wav,
+    local_scratch_dir,
+    remove_appledouble_sidecar,
+)
 from app.services.sdcard import (
     assert_folder_capacity,
     destination_folder,
@@ -225,13 +230,20 @@ def import_library_sample(
         raise LibraryError(f"No download URL for {hit.source}:{hit.id}")
 
     if local_path is not None:
+        if local_path.name.startswith("."):
+            raise LibraryError(f"Skipping hidden file {local_path.name}.")
         suffix = local_path.suffix.lower() or ".bin"
     else:
         suffix = Path(urllib.parse.urlparse(download_url).path).suffix.lower() or ".bin"
     if suffix not in settings.allowed_extension_set and suffix not in {".ogg", ".mp3", ".wav", ".flac", ".aiff", ".aif"}:
         suffix = ".bin"
 
-    with tempfile.NamedTemporaryFile(prefix="tm2_lib_", suffix=suffix, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        prefix="tm2_lib_",
+        suffix=suffix,
+        dir=local_scratch_dir(target_folder),
+        delete=False,
+    ) as handle:
         temp_path = Path(handle.name)
 
     try:
@@ -251,6 +263,7 @@ def import_library_sample(
         raise LibraryError(f"Could not import {hit.name}: {exc}") from exc
     finally:
         temp_path.unlink(missing_ok=True)
+        remove_appledouble_sidecar(temp_path, logger)
 
     logger.info(
         "Imported library sample source=%s id=%s license=%s path=%s",

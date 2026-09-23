@@ -404,10 +404,18 @@ function requireCard() {
   }
 }
 
+function visibleAudioFiles(fileList) {
+  return [...fileList].filter((file) => {
+    const parts = (file.webkitRelativePath || file.name || "").split("/");
+    return parts.every((part) => part && !part.startsWith("."));
+  });
+}
+
 async function uploadFiles(fileList, folderName) {
   requireCard();
-  const files = [...fileList];
+  const files = visibleAudioFiles(fileList);
   if (!files.length) {
+    els.jobStatus.textContent = "No audio files to convert.";
     return;
   }
   if (state.busy) {
