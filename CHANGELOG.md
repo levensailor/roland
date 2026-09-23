@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-22 — Waves Local sample library
+
+Search the installed Waves sample folder from the public library as Waves Local, preview loose audio files, and import them through the TM-2 converter. Encrypted instrument blobs stay out of the list.
+
 ## 2026-09-22 — Public sample library browser
 
 Browse curated CC0 VCSL percussion, Freesound, and Internet Archive from the app, filter for live-performance-safe licenses, and import hits through the existing TM-2 WAV converter onto the SD card.

@@ -83,7 +83,7 @@ Open [http://localhost:8080](http://localhost:8080).
 1. Insert the SD card into this computer with the TM-2 powered off.
 2. Select the volume or paste its path.
 3. Click **Init WAVE tree**. If the badge says READ-ONLY, macOS mounted a dirty FAT (usually from pulling the card while the TM-2 was on). Use **Remount RW**, or eject and reinsert. The lock switch is a different problem (`Media Read-Only`).
-4. Drag audio onto a folder tile, or use **04 / Public library** to search curated CC0 packs / Freesound / Internet Archive and write them to the card.
+4. Drag audio onto a folder tile, or use **04 / Public library** to search curated CC0 packs, Freesound, Internet Archive, or Waves Local and write them to the card.
 5. Eject the card, insert it with the TM-2 off, then assign files on the module with `INST` and `SHIFT` + `-` / `+` to reach the SD list.
 
 `GET /api/routes` lists every API path. All card write routes accept `{ "card_path": "/Volumes/TM-2", ... }` as JSON except upload, which is multipart form fields `card_path`, `folder`, `channels`, and `files`.
@@ -91,8 +91,9 @@ Open [http://localhost:8080](http://localhost:8080).
 Library routes:
 
 - `GET /api/library/sources` — configured backends and folder presets
-- `GET /api/library/search?q=&folder=&source=catalog|freesound|archive&page=` — search hits with license badges
-- `POST /api/library/import` — `{ "card_path", "folder", "source", "id", "channels", "remount" }` downloads, converts, and writes WAVE
+- `GET /api/library/search?q=&folder=&source=catalog|freesound|archive|waves&page=` — search hits with license badges
+- `GET /api/library/audio?source=waves&id=` — stream a file from the local Waves library
+- `POST /api/library/import` — `{ "card_path", "folder", "source", "id", "channels", "remount" }` downloads or copies, converts, and writes WAVE
 
 The right-hand **READ THIS EVERY TIME** panel repeats the pad-assignment steps. The TM-2 does not copy samples into internal memory. The card must stay inserted or the display shows `NO CARD`.
 
@@ -105,6 +106,7 @@ Panel **04 / Public library** searches live-performance-oriented sources and imp
 | Catalog (VCSL) | No | Curated CC0 percussion WAVs from [sgossner/VCSL](https://github.com/sgossner/VCSL/). Safe for paid gigs. |
 | Freesound | Yes | Apply at [freesound.org/apiv2/apply](https://freesound.org/apiv2/apply). Set `FREESOUND_API_KEY` in `.env`. v1 imports HQ previews and converts them to TM-2 WAV (original download needs OAuth2). |
 | Internet Archive | No | Filtered to public-domain / CC0 / CC-BY. Results vary; prefer Catalog or Freesound for drum one-shots. |
+| Waves Local | No | Installed samples under `WAVES_LIBRARY_PATH`. Lists loose WAV, AIFF, FLAC, and MP3 files. Encrypted Waves instrument blobs are skipped. |
 
 `LIBRARY_LICENSE_MODE=performance` (default) keeps CC0 and CC-BY only and hides NC licenses that are unsafe for paid gigs. Set `LIBRARY_LICENSE_MODE=any` to include non-commercial results (shown with an NC warning).
 
@@ -122,6 +124,7 @@ FREESOUND_SEARCH_URL=https://freesound.org/apiv2/search/
 LIBRARY_LICENSE_MODE=performance
 LIBRARY_USER_AGENT=Roland-TM-2-Sample-Loader/1.0
 LIBRARY_PAGE_SIZE=24
+WAVES_LIBRARY_PATH=/Applications/Waves/Data/Instrument Data/Waves Sample Libraries
 ```
 
 ## Deployment

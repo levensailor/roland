@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -140,6 +142,17 @@ def list_sources(settings: Settings) -> list[LibrarySourceInfo]:
             configured=True,
             note="CC0 / public-domain / CC-BY audio only. Results can be messy.",
         ),
+        LibrarySourceInfo(
+            id="waves",
+            label="Waves Local",
+            configured=settings.waves_library_configured,
+            note=(
+                f"Installed samples in {settings.waves_library_dir}. "
+                "Loose WAV, AIFF, FLAC, and MP3 files only."
+                if settings.waves_library_configured
+                else f"Folder not found: {settings.waves_library_dir}"
+            ),
+        ),
     ]
 
 
@@ -179,6 +192,9 @@ def search_library(
         return _search_freesound(settings, logger, cleaned_query, folder, page, preset)
     if source_id == "archive":
         return _search_archive(settings, logger, cleaned_query, folder, page, preset)
+    if source_id == "waves":
+        waves_query = "" if use_preset_query else cleaned_query
+        return _search_waves(settings, waves_query, folder, page)
     raise LibraryError(f"Unknown library source: {source_id}")
 
 
@@ -203,11 +219,15 @@ def import_library_sample(
     target_folder = destination_folder(card_path, target_folder_name, settings)
     assert_folder_capacity(target_folder, 1, settings)
 
+    local_path = resolve_waves_file(settings, hit.id) if hit.source == "waves" else None
     download_url = hit.download_url or hit.preview_url
-    if not download_url:
+    if local_path is None and not download_url:
         raise LibraryError(f"No download URL for {hit.source}:{hit.id}")
 
-    suffix = Path(urllib.parse.urlparse(download_url).path).suffix.lower() or ".bin"
+    if local_path is not None:
+        suffix = local_path.suffix.lower() or ".bin"
+    else:
+        suffix = Path(urllib.parse.urlparse(download_url).path).suffix.lower() or ".bin"
     if suffix not in settings.allowed_extension_set and suffix not in {".ogg", ".mp3", ".wav", ".flac", ".aiff", ".aif"}:
         suffix = ".bin"
 
@@ -215,7 +235,10 @@ def import_library_sample(
         temp_path = Path(handle.name)
 
     try:
-        _download_file(download_url, temp_path, settings, logger)
+        if local_path is not None:
+            shutil.copyfile(local_path, temp_path)
+        else:
+            _download_file(download_url, temp_path, settings, logger)
         destination = unique_destination(target_folder, hit.name, settings)
         probe = convert_to_tm2_wav(
             source_path=temp_path,
@@ -278,6 +301,8 @@ def resolve_hit(
         return _freesound_sound(settings, logger, sample_id, folder)
     if source_id == "archive":
         return _archive_sound(settings, logger, sample_id, folder)
+    if source_id == "waves":
+        return _waves_hit_for_id(settings, sample_id)
     raise LibraryError(f"Unknown library source: {source_id}")
 
 
@@ -350,6 +375,121 @@ def _catalog_hits(settings: Settings) -> list[LibraryHit]:
                 note="Original CC0 WAV from VCSL.",
             )
         )
+    return hits
+
+
+_WAVES_CACHE: dict[str, tuple[float, float, list[LibraryHit]]] = {}
+_WAVES_CACHE_SECONDS = 60.0
+_WAVES_ID_PREFIX = "waves-"
+
+
+def resolve_waves_file(settings: Settings, sample_id: str) -> Path:
+    """Return a playable file under the configured Waves library. Rejects paths outside it."""
+    root = _waves_root(settings)
+    token = sample_id[len(_WAVES_ID_PREFIX) :] if sample_id.startswith(_WAVES_ID_PREFIX) else sample_id
+    relative = Path(urllib.parse.unquote(token))
+    if relative.is_absolute() or ".." in relative.parts:
+        raise LibraryError("Invalid Waves sample id.")
+    target = (root / relative).resolve()
+    if not target.is_relative_to(root) or not target.is_file():
+        raise LibraryError(f"Waves sample was not found: {relative.as_posix()}")
+    if target.suffix.lower() not in settings.allowed_extension_set:
+        raise LibraryError(f"{target.name} is not a supported audio file.")
+    return target
+
+
+def _search_waves(
+    settings: Settings,
+    query: str,
+    folder: str,
+    page: int,
+) -> LibrarySearchResponse:
+    hits = _waves_hits(settings)
+    if folder:
+        hits = [hit for hit in hits if hit.suggested_folder.lower() == folder.lower()]
+    if query:
+        needles = [part for part in query.lower().split() if part]
+        hits = [
+            hit
+            for hit in hits
+            if all(
+                needle in hit.name.lower()
+                or needle in " ".join(hit.tags).lower()
+                or needle in hit.note.lower()
+                for needle in needles
+            )
+        ]
+    page_size = settings.library_page_size
+    start = (page - 1) * page_size
+    return LibrarySearchResponse(
+        source="waves",
+        query=query,
+        page=page,
+        page_size=page_size,
+        count=len(hits),
+        hits=hits[start : start + page_size],
+        warnings=[
+            "Local Waves install. Encrypted instrument files are skipped.",
+        ],
+    )
+
+
+def _waves_hit_for_id(settings: Settings, sample_id: str) -> LibraryHit:
+    for hit in _waves_hits(settings):
+        if hit.id == sample_id:
+            return hit
+    raise LibraryError(f"Waves sample {sample_id} was not found.")
+
+
+def _waves_root(settings: Settings) -> Path:
+    root = settings.waves_library_dir
+    if not root.is_dir():
+        raise LibraryError(
+            f"Waves library folder was not found at {root}. Set WAVES_LIBRARY_PATH in .env."
+        )
+    return root.resolve()
+
+
+def _waves_hits(settings: Settings) -> list[LibraryHit]:
+    root = _waves_root(settings)
+    key = str(root)
+    now = time.monotonic()
+    stamp = root.stat().st_mtime
+    cached = _WAVES_CACHE.get(key)
+    if cached and cached[1] == stamp and now - cached[0] < _WAVES_CACHE_SECONDS:
+        return cached[2]
+
+    hits: list[LibraryHit] = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.name.startswith("."):
+            continue
+        if path.suffix.lower() not in settings.allowed_extension_set:
+            continue
+        relative = path.relative_to(root)
+        sample_id = _WAVES_ID_PREFIX + urllib.parse.quote(relative.as_posix(), safe="")
+        pack = relative.parts[0] if len(relative.parts) > 1 else root.name
+        hits.append(
+            LibraryHit(
+                id=sample_id,
+                source="waves",
+                name=path.stem,
+                license="Local",
+                license_url="",
+                author="Waves",
+                duration_seconds=None,
+                preview_url=f"/api/library/audio?source=waves&id={urllib.parse.quote(sample_id, safe='')}",
+                download_url=str(path),
+                download_kind="local",
+                suggested_folder=_guess_folder(path.stem, list(relative.parts[:-1])),
+                commercial_ok=True,
+                tags=[part.replace(" SD", "") for part in relative.parts[:-1]],
+                note=pack,
+            )
+        )
+    hits.sort(key=lambda hit: (hit.suggested_folder, hit.name.lower()))
+    _WAVES_CACHE[key] = (now, stamp, hits)
     return hits
 
 

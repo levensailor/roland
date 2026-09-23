@@ -574,7 +574,9 @@ function renderLibraryHits(hits) {
         ? "preview→WAV"
         : hit.download_kind === "direct"
           ? "direct WAV"
-          : hit.download_kind;
+          : hit.download_kind === "local"
+            ? "local file"
+            : hit.download_kind;
     row.innerHTML = `
       <td>
         <strong>${escapeHtml(hit.name)}</strong>

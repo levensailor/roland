@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     library_license_mode: str = Field(default="performance")
     library_user_agent: str = Field(default="Roland-TM-2-Sample-Loader/1.0")
     library_page_size: int = Field(default=24)
+    waves_library_path: str = Field(
+        default="/Applications/Waves/Data/Instrument Data/Waves Sample Libraries"
+    )
 
     @field_validator("default_channels")
     @classmethod
@@ -128,6 +131,14 @@ class Settings(BaseSettings):
     @property
     def freesound_configured(self) -> bool:
         return bool(self.freesound_api_key.strip())
+
+    @property
+    def waves_library_dir(self) -> Path:
+        return Path(self.waves_library_path).expanduser()
+
+    @property
+    def waves_library_configured(self) -> bool:
+        return self.waves_library_dir.is_dir()
 
 
 @lru_cache

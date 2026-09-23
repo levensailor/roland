@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
 
 from app.config import Settings, get_settings
 from app.errors import http_error
@@ -19,6 +20,7 @@ from app.services.library import (
     LibraryError,
     import_library_sample,
     list_sources,
+    resolve_waves_file,
     search_library,
 )
 from app.services.sdcard import SdCardError
@@ -58,6 +60,20 @@ def get_router(logger: logging.Logger) -> APIRouter:
         except LibraryError as exc:
             raise http_error(exc, logger) from exc
 
+    @router.get("/audio")
+    def library_audio(
+        source: str = Query(...),
+        sample_id: str = Query(..., alias="id"),
+        settings: Settings = Depends(settings_dep),
+    ) -> FileResponse:
+        if source.strip().lower() != "waves":
+            raise http_error(LibraryError("Preview is only available for Waves Local."), logger)
+        try:
+            target = resolve_waves_file(settings, sample_id)
+        except LibraryError as exc:
+            raise http_error(exc, logger) from exc
+        return FileResponse(path=target, media_type=_audio_media_type(target), filename=target.name)
+
     @router.post("/import", response_model=UploadResult)
     def import_sample(
         payload: LibraryImportRequest,
@@ -90,3 +106,19 @@ def get_router(logger: logging.Logger) -> APIRouter:
         )
 
     return router
+
+
+def _audio_media_type(path) -> str:
+    suffix = path.suffix.lower()
+    return {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".flac": "audio/flac",
+        ".ogg": "audio/ogg",
+        ".oga": "audio/ogg",
+        ".aif": "audio/aiff",
+        ".aiff": "audio/aiff",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+        ".caf": "audio/x-caf",
+    }.get(suffix, "application/octet-stream")
