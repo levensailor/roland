@@ -478,29 +478,32 @@ def _search_archive(
     if not query:
         raise LibraryError("Enter a search query or pick a folder preset.")
 
-    license_clause = (
-        '(licenseurl:*creativecommons.org/publicdomain* OR '
-        'licenseurl:*creativecommons.org/publicdomain/zero* OR '
-        'licenseurl:*creativecommons.org/licenses/by/4.0* OR '
-        'licenseurl:*creativecommons.org/licenses/by/3.0*)'
-    )
     if settings.library_license_mode == "any":
         license_clause = "licenseurl:*creativecommons*"
+    else:
+        # Path wildcards such as licenses/by/4.0* make Archive.org's search
+        # return an Elasticsearch error. Exclude NC here and keep the
+        # stricter CC0 / CC-BY check in _license_allowed.
+        license_clause = "licenseurl:*creativecommons* AND -licenseurl:*by-nc*"
 
-    q = f"mediatype:audio AND ({license_clause}) AND ({query})"
+    q = f"mediatype:audio AND ({license_clause}) AND ({_archive_text_query(query)})"
     rows = settings.library_page_size
-    query_parts = [
-        f"q={urllib.parse.quote(q)}",
-        "fl[]=identifier",
-        "fl[]=title",
-        "fl[]=creator",
-        "fl[]=licenseurl",
-        "rows=" + str(rows),
-        "page=" + str(page),
-        "output=json",
+    params = [
+        ("q", q),
+        ("fl[]", "identifier"),
+        ("fl[]", "title"),
+        ("fl[]", "creator"),
+        ("fl[]", "licenseurl"),
+        ("rows", str(rows)),
+        ("page", str(page)),
+        ("output", "json"),
     ]
-    url = settings.archive_search_url.rstrip("/") + "/?" + "&".join(query_parts)
+    # advancedsearch.php is a script. A slash before the query string 404s.
+    base = settings.archive_search_url.split("?", 1)[0].rstrip("/")
+    url = base + "?" + urllib.parse.urlencode(params)
     payload = _http_json(url, settings, logger)
+    if payload.get("error"):
+        raise LibraryError("Internet Archive search failed. Try a shorter query.")
     response = payload.get("response") or {}
     docs = response.get("docs") or []
     hits: list[LibraryHit] = []
@@ -630,6 +633,24 @@ def _guess_folder(name: str, tags: list) -> str:
         if any(needle in blob for needle in needles):
             return folder
     return "Perc"
+
+
+def _archive_text_query(query: str) -> str:
+    """Turn a user phrase into Archive.org search terms.
+
+    A hyphen is the NOT operator, so "one-shot" would exclude "shot".
+    Archive.org also has almost no items titled with that qualifier, so drop it.
+    """
+    cleaned = query.replace('"', " ").replace("-", " ")
+    cleaned = re.sub(r"\bone\s+shot\b", " ", cleaned, flags=re.IGNORECASE)
+    terms = cleaned.split()
+    if not terms:
+        return "audio"
+    if len(terms) == 1:
+        return terms[0]
+    if len(terms) <= 3:
+        return '"' + " ".join(terms) + '"'
+    return " ".join(terms)
 
 
 def _license_allowed(license_name: str, license_url: str, mode: str) -> bool:

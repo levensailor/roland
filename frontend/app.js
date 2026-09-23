@@ -534,9 +534,17 @@ function renderLibraryFolders() {
 }
 
 async function searchLibrary() {
+  const query = els.libraryQuery.value.trim();
+  const folder = els.libraryFolder.value || "";
+  if (!query && !folder) {
+    state.library.count = 0;
+    els.libraryNote.textContent = "Enter a search query or pick a folder preset.";
+    renderLibraryHits([]);
+    return;
+  }
   const params = new URLSearchParams({
-    q: els.libraryQuery.value.trim(),
-    folder: els.libraryFolder.value || "",
+    q: query,
+    folder,
     source: state.library.source,
     page: String(state.library.page),
   });
